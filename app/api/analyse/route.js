@@ -17,30 +17,25 @@ export async function POST(request) {
       )
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.OPENROUTER_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: 'AI API key not configured.' }, { status: 500 })
     }
 
     // Call Gemini API
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: cvAnalysisPrompt(jobDescription, cvText) }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.3,      // Lower = more consistent, factual output
-            maxOutputTokens: 1500,
-          },
-        }),
-      }
-    )
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemma-3-27b-it:free',
+        messages: [{ role: 'user', content: cvAnalysisPrompt(jobDescription, cvText) }],
+        temperature: 0.3,
+        max_tokens: 1500,
+      }),
+    })
 
     if (!response.ok) {
       const err = await response.text()
@@ -49,7 +44,7 @@ export async function POST(request) {
     }
 
     const data = await response.json()
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
+    const rawText = data.choices?.[0]?.message?.content
 
     if (!rawText) {
       return NextResponse.json({ error: 'No response from AI.' }, { status: 502 })
