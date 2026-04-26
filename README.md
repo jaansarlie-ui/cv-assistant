@@ -3,7 +3,7 @@
 A full-stack web app that helps South African job seekers tailor their CVs and generate cover letters using AI — built with Next.js, Supabase, and the Gemini API.
 
 ## 🚀 Live Demo
-> Add your Vercel URL here once deployed
+> https://cv-assistant-lac.vercel.app/
 
 ## ✨ Features
 - **CV Analyser** — Paste a job description + your CV, get an AI match score and specific improvement tips
