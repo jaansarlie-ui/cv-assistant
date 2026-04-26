@@ -3,6 +3,7 @@
 // Main dashboard — the core screen users will spend most time on
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('analyse') // 'analyse' | 'tracker'
@@ -15,6 +16,9 @@ export default function Dashboard() {
   const [coverLetter, setCoverLetter] = useState(null)
   const [error, setError] = useState(null)
 
+
+  const router = useRouter()
+  
   const handleAnalyse = async () => {
     if (!jobDescription.trim() || !cvText.trim()) {
       setError('Please fill in both the job description and your CV.')
@@ -84,14 +88,7 @@ export default function Dashboard() {
           >
             CV Analyser
           </button>
-          <button
-            onClick={() => setActiveTab('tracker')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'tracker'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+          <button onClick={() => router.push('/dashboard/tracker')} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">
             Application Tracker
           </button>
         </nav>
@@ -119,7 +116,7 @@ export default function Dashboard() {
                   value={jobTitle}
                   onChange={(e) => setJobTitle(e.target.value)}
                   placeholder="e.g. Senior Software Engineer"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
               </div>
               <div>
@@ -131,7 +128,7 @@ export default function Dashboard() {
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="e.g. Takealot"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 />
               </div>
             </div>
@@ -147,7 +144,7 @@ export default function Dashboard() {
                   onChange={(e) => setJobDescription(e.target.value)}
                   placeholder="Paste the full job description here..."
                   rows={12}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
                 />
               </div>
               <div>
@@ -159,7 +156,7 @@ export default function Dashboard() {
                   onChange={(e) => setCvText(e.target.value)}
                   placeholder="Paste your CV text here..."
                   rows={12}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
                 />
               </div>
             </div>
