@@ -1,290 +1,305 @@
 'use client'
-// app/dashboard/page.jsx
-// Main dashboard — the core screen users will spend most time on
-
+'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('analyse') // 'analyse' | 'tracker'
   const [jobDescription, setJobDescription] = useState('')
   const [cvText, setCvText] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingType, setLoadingType] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [coverLetter, setCoverLetter] = useState(null)
   const [error, setError] = useState(null)
+  const [copied, setCopied] = useState(false)
 
-
-  const router = useRouter()
-  
   const handleAnalyse = async () => {
-    if (!jobDescription.trim() || !cvText.trim()) {
-      setError('Please fill in both the job description and your CV.')
-      return
-    }
-    setLoading(true)
-    setError(null)
-    setAnalysis(null)
-    setCoverLetter(null)
-
+    if (!jobDescription.trim() || !cvText.trim()) { setError('Please fill in both fields.'); return }
+    setLoading(true); setLoadingType('analyse'); setError(null); setAnalysis(null); setCoverLetter(null)
     try {
       const res = await fetch('/api/analyse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobDescription, cvText, jobTitle, companyName }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
       setAnalysis(data.analysis)
-    } catch (err) {
-      setError(err.message || 'Analysis failed. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { setError(err.message || 'Analysis failed.') }
+    finally { setLoading(false); setLoadingType(null) }
   }
 
   const handleGenerateLetter = async () => {
-    setLoading(true)
-    setError(null)
-    setCoverLetter(null)
-
+    if (!jobDescription.trim() || !cvText.trim()) { setError('Please fill in both fields.'); return }
+    setLoading(true); setLoadingType('letter'); setError(null); setCoverLetter(null)
     try {
       const res = await fetch('/api/cover-letter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobDescription, cvText, jobTitle, companyName }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
       setCoverLetter(data.coverLetter)
-    } catch (err) {
-      setError(err.message || 'Cover letter generation failed.')
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { setError(err.message || 'Failed.') }
+    finally { setLoading(false); setLoadingType(null) }
   }
 
-  const scoreColour = (score) => {
-    if (score >= 75) return 'text-green-600'
-    if (score >= 50) return 'text-yellow-600'
-    return 'text-red-500'
+  const handleCopy = () => {
+    navigator.clipboard.writeText(coverLetter)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
+
+  const scoreColor = (s) => s >= 75 ? '#16a34a' : s >= 50 ? '#ca8a04' : '#dc2626'
+  const scoreBg = (s) => s >= 75 ? '#f0fdf4' : s >= 50 ? '#fefce8' : '#fef2f2'
+  const scoreLabel = (s) => s >= 75 ? 'Strong Match' : s >= 50 ? 'Moderate Match' : 'Weak Match'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">🇿🇦 CareerCraft SA</h1>
-        <nav className="flex gap-4">
-          <button
-            onClick={() => setActiveTab('analyse')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'analyse'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            CV Analyser
-          </button>
-          <button onClick={() => router.push('/dashboard/tracker')} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">
-            Application Tracker
-          </button>
-        </nav>
-      </header>
+    <div style={{ padding: '2.5rem', maxWidth: '1100px', margin: '0 auto' }}>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        {activeTab === 'analyse' && (
-          <div className="space-y-6">
+      {/* Page header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0.5rem' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '10px',
+            background: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.1rem',
+          }}>🔍</div>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--text-primary)', fontWeight: '400', margin: 0 }}>
+            CV Analyser
+          </h2>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginLeft: '52px' }}>
+          Paste a job description and your CV to get an AI-powered match score and cover letter.
+        </p>
+      </div>
+
+      {/* Job details row */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem',
+        marginBottom: '1rem',
+      }}>
+        {[
+          { label: 'Job Title', key: 'jobTitle', val: jobTitle, set: setJobTitle, placeholder: 'e.g. Junior Software Developer', icon: '💼' },
+          { label: 'Company', key: 'company', val: companyName, set: setCompanyName, placeholder: 'e.g. Takealot, Discovery, FNB', icon: '🏢' },
+        ].map(({ label, val, set, placeholder, icon }) => (
+          <div key={label} style={{
+            background: 'white', border: '1.5px solid var(--border)', borderRadius: '12px',
+            padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '12px',
+          }}>
+            <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>
+                {label} <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <input
+                value={val} onChange={e => set(e.target.value)} placeholder={placeholder}
+                style={{
+                  border: 'none', outline: 'none', width: '100%', fontSize: '0.9375rem',
+                  color: 'var(--text-primary)', background: 'transparent', fontFamily: 'var(--font-sans)',
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main text inputs */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+        {[
+          { label: 'Job Description', val: jobDescription, set: setJobDescription, placeholder: 'Paste the full job description here...', badge: 'Required' },
+          { label: 'Your CV', val: cvText, set: setCvText, placeholder: 'Paste your CV text here...', badge: 'Required' },
+        ].map(({ label, val, set, placeholder, badge }) => (
+          <div key={label} style={{
+            background: 'white', border: '1.5px solid var(--border)', borderRadius: '14px',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            transition: 'border-color 0.15s',
+          }}>
+            <div style={{
+              padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'var(--surface)',
+            }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-primary)' }}>{label}</span>
+              <span style={{
+                fontSize: '0.6875rem', fontWeight: '600', color: 'var(--green)',
+                background: 'var(--green-light)', padding: '2px 8px', borderRadius: '100px',
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>{badge}</span>
+            </div>
+            <textarea
+              value={val} onChange={e => set(e.target.value)} placeholder={placeholder} rows={13}
+              style={{
+                border: 'none', outline: 'none', resize: 'none', padding: '1rem 1.25rem',
+                fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.6',
+                background: 'transparent', fontFamily: 'var(--font-sans)', flex: 1,
+              }}
+            />
+            <div style={{ padding: '0.5rem 1.25rem', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {val.trim() ? `${val.trim().split(/\s+/).length} words` : 'No content yet'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626',
+          padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.875rem', marginBottom: '1rem',
+        }}>{error}</div>
+      )}
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '2.5rem' }}>
+        <button onClick={handleAnalyse} disabled={loading} style={{
+          background: loading && loadingType === 'analyse' ? '#155538' : 'var(--green)',
+          color: 'white', border: 'none', padding: '0.75rem 1.75rem', borderRadius: '10px',
+          fontWeight: '600', fontSize: '0.9rem', cursor: loading ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', gap: '8px', opacity: loading && loadingType === 'letter' ? 0.5 : 1,
+          transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
+        }}>
+          {loading && loadingType === 'analyse' ? (
+            <><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span> Analysing...</>
+          ) : '🔍 Analyse My CV'}
+        </button>
+        <button onClick={handleGenerateLetter} disabled={loading} style={{
+          background: 'white', color: 'var(--green)', border: '1.5px solid var(--green)',
+          padding: '0.75rem 1.75rem', borderRadius: '10px', fontWeight: '600', fontSize: '0.9rem',
+          cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+          opacity: loading && loadingType === 'analyse' ? 0.5 : 1, transition: 'all 0.15s',
+          fontFamily: 'var(--font-sans)',
+        }}>
+          {loading && loadingType === 'letter' ? (
+            <><span>⏳</span> Generating...</>
+          ) : '✍️ Generate Cover Letter'}
+        </button>
+      </div>
+
+      {/* Analysis result */}
+      {analysis && (
+        <div style={{ marginBottom: '1.5rem' }} className="fade-up">
+          {/* Score hero */}
+          <div style={{
+            background: scoreBg(analysis.matchScore),
+            border: `1.5px solid ${scoreColor(analysis.matchScore)}30`,
+            borderRadius: '16px', padding: '1.75rem 2rem', marginBottom: '1rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">CV Analyser</h2>
-              <p className="text-gray-500 mt-1">
-                Paste a job description and your CV — our AI will score your match and
-                tell you exactly what to improve.
+              <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: scoreColor(analysis.matchScore), textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                {scoreLabel(analysis.matchScore)}
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', maxWidth: '600px', margin: 0 }}>
+                {analysis.summary}
               </p>
             </div>
-
-            {/* Optional job details */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Title <span className="text-gray-400">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="e.g. Senior Software Engineer"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
+            <div style={{ textAlign: 'center', flexShrink: 0, marginLeft: '2rem' }}>
+              <div style={{ fontSize: '3.5rem', fontWeight: '800', color: scoreColor(analysis.matchScore), lineHeight: 1 }}>
+                {analysis.matchScore}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Company <span className="text-gray-400">(optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. Takealot"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
+              <div style={{ fontSize: '1rem', fontWeight: '600', color: scoreColor(analysis.matchScore) }}>/ 100</div>
             </div>
+          </div>
 
-            {/* Main inputs */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                  placeholder="Paste the full job description here..."
-                  rows={12}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
-                />
+          {/* Strengths + Improvements */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                <div style={{ width: '28px', height: '28px', background: '#f0fdf4', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem' }}>✅</div>
+                <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Strengths</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your CV <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={cvText}
-                  onChange={(e) => setCvText(e.target.value)}
-                  placeholder="Paste your CV text here..."
-                  rows={12}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 resize-none"
-                />
-              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {analysis.strengths?.map((s, i) => (
+                  <li key={i} style={{ display: 'flex', gap: '10px', fontSize: '0.8375rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                    <span style={{ color: '#16a34a', fontWeight: '700', flexShrink: 0, marginTop: '1px' }}>✓</span>{s}
+                  </li>
+                ))}
+              </ul>
             </div>
+            <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                <div style={{ width: '28px', height: '28px', background: '#fffbeb', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem' }}>🔧</div>
+                <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Improvements</span>
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {analysis.improvements?.map((item, i) => (
+                  <li key={i} style={{ fontSize: '0.8375rem', lineHeight: '1.5' }}>
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)', display: 'block', marginBottom: '2px' }}>{item.area}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{item.suggestion}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
 
-            {error && (
-              <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+          {/* Keywords + SA notes */}
+          <div style={{ display: 'grid', gridTemplateColumns: analysis.saContext ? '1fr 1fr' : '1fr', gap: '1rem' }}>
+            {analysis.missingKeywords?.length > 0 && (
+              <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem' }}>
+                  <div style={{ width: '28px', height: '28px', background: 'var(--gold-light)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem' }}>🔑</div>
+                  <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Missing Keywords</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Add these to your CV</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {analysis.missingKeywords.map((kw, i) => (
+                    <span key={i} style={{
+                      padding: '4px 12px', background: 'var(--gold-light)', color: '#92620a',
+                      borderRadius: '100px', fontSize: '0.8125rem', fontWeight: '500',
+                      border: '1px solid rgba(201,168,76,0.3)',
+                    }}>{kw}</span>
+                  ))}
+                </div>
               </div>
             )}
-
-            {/* Action buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleAnalyse}
-                disabled={loading}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Analysing...' : '🔍 Analyse My CV'}
-              </button>
-              <button
-                onClick={handleGenerateLetter}
-                disabled={loading}
-                className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Generating...' : '✍️ Generate Cover Letter'}
-              </button>
-            </div>
-
-            {/* Analysis results */}
-            {analysis && (
-              <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900">Analysis Results</h3>
-                  <div className="text-center">
-                    <div className={`text-4xl font-bold ${scoreColour(analysis.matchScore)}`}>
-                      {analysis.matchScore}%
-                    </div>
-                    <div className="text-xs text-gray-500">Match Score</div>
-                  </div>
+            {analysis.saContext && (
+              <div style={{
+                background: 'linear-gradient(135deg, var(--green-light) 0%, #f0fdf4 100%)',
+                border: '1.5px solid rgba(26,107,69,0.2)', borderRadius: '14px', padding: '1.25rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '1.25rem' }}>🇿🇦</span>
+                  <span style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--green)' }}>SA Market Notes</span>
                 </div>
-
-                <p className="text-gray-700 text-sm">{analysis.summary}</p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm mb-2">✅ Strengths</h4>
-                    <ul className="space-y-1">
-                      {analysis.strengths?.map((s, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex gap-2">
-                          <span className="text-green-500 mt-0.5">•</span>
-                          {s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm mb-2">🔧 Improvements</h4>
-                    <ul className="space-y-2">
-                      {analysis.improvements?.map((item, i) => (
-                        <li key={i} className="text-sm">
-                          <span className="font-medium text-gray-800">{item.area}:</span>{' '}
-                          <span className="text-gray-600">{item.suggestion}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {analysis.missingKeywords?.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-800 text-sm mb-2">
-                      🔑 Missing Keywords
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {analysis.missingKeywords.map((kw, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-medium"
-                        >
-                          {kw}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {analysis.saContext && (
-                  <div className="bg-blue-50 rounded-lg px-4 py-3">
-                    <h4 className="font-semibold text-blue-800 text-sm mb-1">🇿🇦 SA Market Notes</h4>
-                    <p className="text-blue-700 text-sm">{analysis.saContext}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Cover letter result */}
-            {coverLetter && (
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Generated Cover Letter</h3>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(coverLetter)}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Copy to clipboard
-                  </button>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {coverLetter}
-                  </p>
-                </div>
+                <p style={{ fontSize: '0.8375rem', color: 'var(--green)', opacity: 0.85, lineHeight: '1.6', margin: 0 }}>{analysis.saContext}</p>
               </div>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {activeTab === 'tracker' && (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Tracker</h2>
-            <p className="text-gray-500">
-              Track your job applications here. (Build this out in Week 3 — connect it to Supabase
-              to save applications per user.)
+      {/* Cover letter result */}
+      {coverLetter && (
+        <div style={{ background: 'white', border: '1.5px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }} className="fade-up">
+          <div style={{
+            padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.1rem' }}>✍️</span>
+              <span style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)' }}>Generated Cover Letter</span>
+            </div>
+            <button onClick={handleCopy} style={{
+              background: copied ? 'var(--green-light)' : 'white',
+              color: copied ? 'var(--green)' : 'var(--text-secondary)',
+              border: '1.5px solid var(--border)', padding: '0.4rem 1rem',
+              borderRadius: '8px', fontSize: '0.8125rem', cursor: 'pointer', fontWeight: '500',
+              fontFamily: 'var(--font-sans)', transition: 'all 0.2s',
+            }}>
+              {copied ? '✓ Copied!' : 'Copy to clipboard'}
+            </button>
+          </div>
+          <div style={{ padding: '1.75rem 2rem' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.9', whiteSpace: 'pre-wrap', margin: 0 }}>
+              {coverLetter}
             </p>
-            {/* TODO Week 3: Build application tracker table with Supabase */}
           </div>
-        )}
-      </main>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

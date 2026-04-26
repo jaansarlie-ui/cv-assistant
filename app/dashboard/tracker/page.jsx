@@ -1,27 +1,28 @@
 'use client'
-// app/dashboard/tracker/page.jsx
-// Application tracker — add, view, update, and delete job applications
-
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const STATUS_OPTIONS = ['applied', 'interview', 'offer', 'rejected', 'withdrawn']
 
-const STATUS_STYLES = {
-  applied:   { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Applied' },
-  interview: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Interview' },
-  offer:     { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Offer 🎉' },
-  rejected:  { bg: 'bg-red-100',    text: 'text-red-600',    label: 'Rejected' },
-  withdrawn: { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Withdrawn' },
+const STATUS_CONFIG = {
+  applied:   { label: 'Applied',   bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6', border: '#BFDBFE' },
+  interview: { label: 'Interview', bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' },
+  offer:     { label: 'Offer 🎉',  bg: '#F0FDF4', text: '#166534', dot: '#22C55E', border: '#BBF7D0' },
+  rejected:  { label: 'Rejected',  bg: '#FFF1F2', text: '#9F1239', dot: '#F43F5E', border: '#FECDD3' },
+  withdrawn: { label: 'Withdrawn', bg: '#F8FAFC', text: '#64748B', dot: '#94A3B8', border: '#E2E8F0' },
 }
 
+const STAT_CONFIG = [
+  { key: 'applied',   icon: '📤', label: 'Applied' },
+  { key: 'interview', icon: '🗣️', label: 'Interview' },
+  { key: 'offer',     icon: '🎉', label: 'Offer' },
+  { key: 'rejected',  icon: '❌', label: 'Rejected' },
+  { key: 'withdrawn', icon: '↩️', label: 'Withdrawn' },
+]
+
 const EMPTY_FORM = {
-  job_title: '',
-  company_name: '',
-  status: 'applied',
-  applied_date: new Date().toISOString().split('T')[0],
-  job_url: '',
-  notes: '',
+  job_title: '', company_name: '', status: 'applied',
+  applied_date: new Date().toISOString().split('T')[0], job_url: '', notes: '',
 }
 
 export default function TrackerPage() {
@@ -32,84 +33,38 @@ export default function TrackerPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [editingId, setEditingId] = useState(null)
+  const [filterStatus, setFilterStatus] = useState('all')
 
-  useEffect(() => {
-    fetchApplications()
-  }, [])
+  useEffect(() => { fetchApplications() }, [])
 
   const fetchApplications = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('applications')
-      .select('*')
-      .order('applied_date', { ascending: false })
-
-    if (error) {
-      console.error('Fetch error:', error)
-      setError('Could not load applications. Make sure you are logged in.')
-    } else {
-      setApplications(data || [])
-    }
+    const { data, error } = await supabase.from('applications').select('*').order('applied_date', { ascending: false })
+    if (error) setError('Could not load applications.')
+    else setApplications(data || [])
     setLoading(false)
   }
 
   const handleSubmit = async () => {
-    if (!form.job_title.trim() || !form.company_name.trim()) {
-      setError('Job title and company name are required.')
-      return
-    }
-    setSaving(true)
-    setError(null)
-
-    // Get current user
+    if (!form.job_title.trim() || !form.company_name.trim()) { setError('Job title and company are required.'); return }
+    setSaving(true); setError(null)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setError('You must be logged in to save applications.')
-      setSaving(false)
-      return
-    }
+    if (!user) { setError('You must be logged in.'); setSaving(false); return }
 
-    if (editingId) {
-      // Update existing
-      const { error } = await supabase
-        .from('applications')
-        .update({ ...form })
-        .eq('id', editingId)
+    const op = editingId
+      ? supabase.from('applications').update({ ...form }).eq('id', editingId)
+      : supabase.from('applications').insert([{ ...form, user_id: user.id }])
 
-      if (error) setError('Failed to update application.')
-      else {
-        setEditingId(null)
-        setForm(EMPTY_FORM)
-        setShowForm(false)
-        fetchApplications()
-      }
-    } else {
-      // Insert new
-      const { error } = await supabase
-        .from('applications')
-        .insert([{ ...form, user_id: user.id }])
-
-      if (error) setError('Failed to save application.')
-      else {
-        setForm(EMPTY_FORM)
-        setShowForm(false)
-        fetchApplications()
-      }
-    }
+    const { error } = await op
+    if (error) setError('Failed to save application.')
+    else { setEditingId(null); setForm(EMPTY_FORM); setShowForm(false); fetchApplications() }
     setSaving(false)
   }
 
   const handleEdit = (app) => {
-    setForm({
-      job_title: app.job_title,
-      company_name: app.company_name,
-      status: app.status,
-      applied_date: app.applied_date,
-      job_url: app.job_url || '',
-      notes: app.notes || '',
-    })
-    setEditingId(app.id)
-    setShowForm(true)
+    setForm({ job_title: app.job_title, company_name: app.company_name, status: app.status,
+      applied_date: app.applied_date, job_url: app.job_url || '', notes: app.notes || '' })
+    setEditingId(app.id); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -121,227 +76,207 @@ export default function TrackerPage() {
   }
 
   const handleStatusChange = async (id, newStatus) => {
-    const { error } = await supabase
-      .from('applications')
-      .update({ status: newStatus })
-      .eq('id', id)
-    if (!error) fetchApplications()
+    await supabase.from('applications').update({ status: newStatus }).eq('id', id)
+    fetchApplications()
   }
 
-  const cancelForm = () => {
-    setShowForm(false)
-    setEditingId(null)
-    setForm(EMPTY_FORM)
-    setError(null)
-  }
-
-  // Stats
-  const stats = STATUS_OPTIONS.reduce((acc, s) => {
-    acc[s] = applications.filter(a => a.status === s).length
-    return acc
-  }, {})
+  const stats = STATUS_OPTIONS.reduce((acc, s) => { acc[s] = applications.filter(a => a.status === s).length; return acc }, {})
+  const filtered = filterStatus === 'all' ? applications : applications.filter(a => a.status === filterStatus)
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div style={{ padding: '2.5rem', maxWidth: '1000px', margin: '0 auto' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '2rem' }}>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Application Tracker</h2>
-          <p className="text-gray-500 text-sm mt-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0.5rem' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>📋</div>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.75rem', color: 'var(--text-primary)', fontWeight: '400', margin: 0 }}>
+              Job Tracker
+            </h2>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginLeft: '52px' }}>
             {applications.length} application{applications.length !== 1 ? 's' : ''} tracked
           </p>
         </div>
         {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
+          <button onClick={() => setShowForm(true)} style={{
+            background: 'var(--green)', color: 'white', border: 'none',
+            padding: '0.7rem 1.5rem', borderRadius: '10px', fontWeight: '600',
+            fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}>
             + Add Application
           </button>
         )}
       </div>
 
-      {/* Stats bar */}
-      {applications.length > 0 && (
-        <div className="grid grid-cols-5 gap-3">
-          {STATUS_OPTIONS.map(s => (
-            <div key={s} className={`${STATUS_STYLES[s].bg} rounded-lg px-3 py-2 text-center`}>
-              <div className={`text-xl font-bold ${STATUS_STYLES[s].text}`}>{stats[s]}</div>
-              <div className={`text-xs ${STATUS_STYLES[s].text} opacity-80`}>{STATUS_STYLES[s].label}</div>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
+        {STAT_CONFIG.map(({ key, icon, label }) => (
+          <button key={key} onClick={() => setFilterStatus(filterStatus === key ? 'all' : key)} style={{
+            background: filterStatus === key ? STATUS_CONFIG[key].bg : 'white',
+            border: `1.5px solid ${filterStatus === key ? STATUS_CONFIG[key].border : 'var(--border)'}`,
+            borderRadius: '12px', padding: '1rem 0.75rem', cursor: 'pointer',
+            textAlign: 'center', transition: 'all 0.15s',
+          }}>
+            <div style={{ fontSize: '1.25rem', marginBottom: '6px' }}>{icon}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '700', color: STATUS_CONFIG[key].text, lineHeight: 1, marginBottom: '4px' }}>
+              {stats[key]}
             </div>
-          ))}
-        </div>
-      )}
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '500' }}>{label}</div>
+          </button>
+        ))}
+      </div>
 
-      {/* Add / Edit form */}
+      {/* Add/Edit form */}
       {showForm && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
-          <h3 className="font-semibold text-gray-900">
-            {editingId ? 'Edit Application' : 'Add New Application'}
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
+        <div style={{
+          background: 'white', border: '1.5px solid var(--border)', borderRadius: '16px',
+          overflow: 'hidden', marginBottom: '1.5rem',
+        }} className="fade-up">
+          <div style={{ padding: '1rem 1.5rem', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
+              {editingId ? '✏️ Edit Application' : '+ New Application'}
+            </span>
+            <button onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setError(null) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Job Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.job_title}
-                onChange={e => setForm({ ...form, job_title: e.target.value })}
-                placeholder="e.g. Junior Software Developer"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              />
+              <label className="label">Job Title *</label>
+              <input className="input" type="text" value={form.job_title}
+                onChange={e => setForm({ ...form, job_title: e.target.value })} placeholder="e.g. Junior Software Developer" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={form.company_name}
-                onChange={e => setForm({ ...form, company_name: e.target.value })}
-                placeholder="e.g. Takealot"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              />
+              <label className="label">Company *</label>
+              <input className="input" type="text" value={form.company_name}
+                onChange={e => setForm({ ...form, company_name: e.target.value })} placeholder="e.g. Takealot, FNB, Discovery" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={form.status}
-                onChange={e => setForm({ ...form, status: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                {STATUS_OPTIONS.map(s => (
-                  <option key={s} value={s}>{STATUS_STYLES[s].label}</option>
-                ))}
+              <label className="label">Status</label>
+              <select className="input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date Applied</label>
-              <input
-                type="date"
-                value={form.applied_date}
-                onChange={e => setForm({ ...form, applied_date: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              />
+              <label className="label">Date Applied</label>
+              <input className="input" type="date" value={form.applied_date} onChange={e => setForm({ ...form, applied_date: e.target.value })} />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Job URL <span className="text-gray-400">(optional)</span>
-              </label>
-              <input
-                type="url"
-                value={form.job_url}
-                onChange={e => setForm({ ...form, job_url: e.target.value })}
-                placeholder="https://careers.company.co.za/job/..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="label">Job URL <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input className="input" type="url" value={form.job_url}
+                onChange={e => setForm({ ...form, job_url: e.target.value })} placeholder="https://careers.company.co.za/..." />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes <span className="text-gray-400">(optional)</span>
-              </label>
-              <textarea
-                value={form.notes}
-                onChange={e => setForm({ ...form, notes: e.target.value })}
-                placeholder="e.g. Spoke to recruiter, follow up on Monday..."
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label className="label">Notes <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+              <textarea className="input" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
+                placeholder="e.g. Spoke to recruiter, follow up on Monday..." rows={3} style={{ resize: 'none' }} />
             </div>
           </div>
-
-          {error && (
-            <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
+          {error && <div style={{ margin: '0 1.5rem', marginBottom: '1rem' }} className="error-box">{error}</div>}
+          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px' }}>
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary">
               {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Application'}
             </button>
-            <button
-              onClick={cancelForm}
-              className="px-5 py-2 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setError(null) }} className="btn-secondary">
               Cancel
             </button>
           </div>
         </div>
       )}
 
+      {/* Filter indicator */}
+      {filterStatus !== 'all' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Showing: </span>
+          <span style={{
+            padding: '3px 12px', borderRadius: '100px', fontSize: '0.8125rem', fontWeight: '500',
+            background: STATUS_CONFIG[filterStatus].bg, color: STATUS_CONFIG[filterStatus].text,
+            border: `1px solid ${STATUS_CONFIG[filterStatus].border}`,
+          }}>{STATUS_CONFIG[filterStatus].label}</span>
+          <button onClick={() => setFilterStatus('all')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8125rem' }}>
+            Clear filter ×
+          </button>
+        </div>
+      )}
+
       {/* Applications list */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
-      ) : applications.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-gray-200 rounded-xl">
-          <div className="text-4xl mb-3">📋</div>
-          <div className="text-gray-500 text-sm">No applications yet. Add your first one above!</div>
+        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>Loading...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{
+          textAlign: 'center', padding: '4rem 2rem', background: 'white',
+          border: '1.5px dashed var(--border)', borderRadius: '16px',
+        }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{filterStatus === 'all' ? '📋' : STATUS_CONFIG[filterStatus]?.dot ? '🔍' : '📋'}</div>
+          <div style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.5rem' }}>
+            {filterStatus === 'all' ? 'No applications yet' : `No ${STATUS_CONFIG[filterStatus].label} applications`}
+          </div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            {filterStatus === 'all' ? 'Click "Add Application" to track your first job application.' : 'Try a different filter or add a new application.'}
+          </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {applications.map(app => (
-            <div
-              key={app.id}
-              className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-start justify-between gap-4"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="font-semibold text-gray-900">{app.job_title}</span>
-                  <span className="text-gray-400">@</span>
-                  <span className="text-gray-700">{app.company_name}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {filtered.map((app, idx) => (
+            <div key={app.id} className="fade-up" style={{
+              background: 'white', border: '1.5px solid var(--border)', borderRadius: '14px',
+              padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem',
+              animationDelay: `${idx * 0.05}s`, transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}>
+              {/* Status dot */}
+              <div style={{
+                width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+                background: STATUS_CONFIG[app.status].dot,
+              }} />
+
+              {/* Main info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: '600', fontSize: '0.9375rem', color: 'var(--text-primary)' }}>{app.job_title}</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>at</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500', fontSize: '0.9rem' }}>{app.company_name}</span>
                   {app.job_url && (
-                    <a
-                      href={app.job_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 text-xs hover:underline"
-                    >
-                      View listing ↗
-                    </a>
+                    <a href={app.job_url} target="_blank" rel="noopener noreferrer" style={{
+                      fontSize: '0.75rem', color: 'var(--green)', textDecoration: 'none', fontWeight: '500',
+                    }}>View listing ↗</a>
                   )}
                 </div>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="text-xs text-gray-400">
-                    Applied {new Date(app.applied_date).toLocaleDateString('en-ZA', {
-                      day: 'numeric', month: 'short', year: 'numeric'
-                    })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Applied {new Date(app.applied_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                   {app.notes && (
-                    <span className="text-xs text-gray-500 truncate max-w-xs">{app.notes}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+                      💬 {app.notes}
+                    </span>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 flex-shrink-0">
-                {/* Inline status updater */}
-                <select
-                  value={app.status}
-                  onChange={e => handleStatusChange(app.id, e.target.value)}
-                  className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${STATUS_STYLES[app.status].bg} ${STATUS_STYLES[app.status].text}`}
-                >
-                  {STATUS_OPTIONS.map(s => (
-                    <option key={s} value={s}>{STATUS_STYLES[s].label}</option>
-                  ))}
-                </select>
+              {/* Status selector */}
+              <select value={app.status} onChange={e => handleStatusChange(app.id, e.target.value)} style={{
+                padding: '5px 10px', borderRadius: '100px', border: `1.5px solid ${STATUS_CONFIG[app.status].border}`,
+                background: STATUS_CONFIG[app.status].bg, color: STATUS_CONFIG[app.status].text,
+                fontSize: '0.8125rem', fontWeight: '600', cursor: 'pointer',
+                fontFamily: 'var(--font-sans)', outline: 'none',
+              }}>
+                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
+              </select>
 
-                <button
-                  onClick={() => handleEdit(app)}
-                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(app.id)}
-                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                >
-                  Delete
-                </button>
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                <button onClick={() => handleEdit(app)} style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)',
+                  padding: '5px 12px', borderRadius: '8px', fontSize: '0.8125rem', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', fontWeight: '500',
+                }}>Edit</button>
+                <button onClick={() => handleDelete(app.id)} style={{
+                  background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48',
+                  padding: '5px 12px', borderRadius: '8px', fontSize: '0.8125rem', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', fontWeight: '500',
+                }}>Delete</button>
               </div>
             </div>
           ))}
